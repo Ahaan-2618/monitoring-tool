@@ -1,23 +1,61 @@
 const express = require("express");
-const path = require("path"); // TODO - handle this
+const path = require("path");
 const { slowFunction } = require("./utils");
 const promClient = require("prom-client");
+const responseTime = require("response-time");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// TODO - Add comments
+// Collect default metrics
 const metricsCollector = promClient.collectDefaultMetrics;
 metricsCollector({ register: promClient.register });
 
-// TODO - Add proper comments
+// Custom metrics for monitoring
+const reqResTime = new promClient.Histogram({
+  name: "http_request_duration_seconds",
+  help: "Duration of HTTP requests in seconds",
+  labelNames: ["method", "route", "status_code"],
+  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10], // Seconds
+});
+
+const requestCounter = new promClient.Counter({
+  name: "http_requests_total",
+  help: "Total number of HTTP requests",
+  labelNames: ["method", "route", "status_code"],
+});
 
 // Middleware
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
-app.use(express.static("public")); // Serve static files from public directory
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public"));
 
-// Basic routes
+// Single responseTime middleware for both metrics
+app.use(
+  responseTime((req, res, time) => {
+    const labels = {
+      method: req.method,
+      route: normalizeRoute(req.path),
+      status_code: Math.floor(res.statusCode / 100) + "xx",
+    };
+
+    // Count requests
+    requestCounter.labels(labels).inc();
+
+    // Record duration (convert milliseconds to seconds)
+    reqResTime.labels(labels).observe(time / 1000);
+  })
+);
+
+// Function to normalize routes and reduce cardinality
+function normalizeRoute(path) {
+  return path
+    .replace(/\/\d+/g, "/:id") // Replace numbers with :id
+    .replace(/\/[a-f0-9-]{36}/g, "/:uuid") // Replace UUIDs
+    .replace(/\/[a-f0-9]{24}/g, "/:objectid"); // Replace MongoDB ObjectIds
+}
+
+// Routes
 app.get("/", (req, res) => {
   res.json({
     message: "Welcome to the Express Server!",
@@ -33,7 +71,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",
@@ -42,7 +79,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Sample API routes
 app.get("/api/users", (req, res) => {
   const users = [
     { id: 1, name: "John Doe", email: "john@example.com" },
@@ -85,13 +121,27 @@ app.get("/api/slowAPI", async (req, res) => {
   }
 });
 
+// Metrics endpoint
+app.get("/metrics", async (req, res) => {
+  try {
+    res.setHeader("Content-Type", promClient.register.contentType);
+    const metrics = await promClient.register.metrics();
+    res.send(metrics);
+  } catch (err) {
+    console.error("Error generating metrics:", err);
+    res.status(500).json({ status: "Error", Error: err.message });
+  }
+});
+
+// Keep the /api/metrics endpoint for backwards compatibility
 app.get("/api/metrics", async (req, res) => {
   try {
-    res.setHeader("Content-type", promClient.register.contentType);
+    res.setHeader("Content-Type", promClient.register.contentType);
     const metrics = await promClient.register.metrics();
-    return res.send(metrics);
+    res.send(metrics);
   } catch (err) {
-    return res.status(500).json({ status: "Error", Error: err.message });
+    console.error("Error generating metrics:", err);
+    res.status(500).json({ status: "Error", Error: err.message });
   }
 });
 
@@ -118,7 +168,7 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`👥 Users API: http://localhost:${PORT}/api/users`);
   console.log(`🦥 Slow API: http://localhost:${PORT}/api/slowAPI`);
-  console.log(`✖️  Metrics API: http://localhost:${PORT}/api/metrics`);
+  console.log(`📈 Metrics: http://localhost:${PORT}/metrics`);
 });
 
 module.exports = app;
