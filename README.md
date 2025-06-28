@@ -16,12 +16,25 @@ Docker Compose – For container orchestration
 
 📊 Grafana metrics dashboard
 
+![image](https://github.com/user-attachments/assets/8282ddf1-ea93-4cf4-876b-c4dee5db87c6)
+
+ℹ️ Status of each API with latency and performance
+
+![image](https://github.com/user-attachments/assets/cbfdcc2a-f57f-4252-88e1-f130d547bcdd)
+
+ℹ️ Count of request per API 
+
+![image](https://github.com/user-attachments/assets/c767f0a0-e8ca-4cbf-9257-9e2350e4636c)
+
+
 🪵 Loki logs query interface
 
 ![image](https://github.com/user-attachments/assets/10a3447a-afce-44ed-b370-0c4574bb05e2)
 
 
 🔧 Prometheus targets/status
+
+![image](https://github.com/user-attachments/assets/41a0acc4-319a-41bf-acc0-8901c6cc3027)
 
 ⚙️ Features
 Real-time collection of custom metrics
@@ -45,9 +58,7 @@ docker-compose up --build
 Visit:
 
 Prometheus: http://localhost:9090
-
 Grafana: http://localhost:3000 (default login: admin/admin)
-
 Loki: http://localhost:3100
 
 📈 Metrics Tracked
