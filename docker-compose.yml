@@ -33,7 +33,26 @@ services:
           memory: 1G
           cpus: "0.5"
 
-  # Optional: Grafana for visualization
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.3"
+
+  # Grafana for visualization
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -46,8 +65,11 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
+    depends_on:
+      - prometheus
+      - loki
 
-  # Optional: Node Exporter for system metrics
+  # Node Exporter for system metrics
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
@@ -67,20 +89,25 @@ services:
     networks:
       - monitoring
 
-  nodejs-app:
-    image: your-nodejs-app:latest # or build from Dockerfile
-    container_name: nodejs-app
-    ports:
-      - "3000:3000"
-    networks:
-      - monitoring
-    restart: unless-stopped
+  # nodejs-app:
+  #   image: your-nodejs-app:latest # or build from Dockerfile
+  #   container_name: nodejs-app
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - monitoring
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - loki
+  #     - prometheus
 
 # Define volumes for data persistence
 volumes:
   prometheus-data:
     driver: local
   grafana-data:
+    driver: local
+  loki-data:
     driver: local
 
 # Create a custom network for service communication

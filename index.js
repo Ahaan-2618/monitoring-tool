@@ -3,6 +3,21 @@ const path = require("path");
 const { slowFunction } = require("./utils");
 const promClient = require("prom-client");
 const responseTime = require("response-time");
+const { createLogger, transports, format } = require("winston");
+const LokiTransport = require("winston-loki");
+const options = {
+  transports: [
+    new LokiTransport({
+      host: "http://localhost:3100", // Changed from "http://loki:3100"
+      labels: { job: "nodejs-app" }, // Added a job label for easier filtering
+    }),
+    // Added console transport to see logs locally too
+    new transports.Console({
+      format: format.simple(),
+    }),
+  ],
+};
+const logger = createLogger(options);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,13 +65,14 @@ app.use(
 // Function to normalize routes and reduce cardinality
 function normalizeRoute(path) {
   return path
-    .replace(/\/\d+/g, "/:id") // Replace numbers with :id
-    .replace(/\/[a-f0-9-]{36}/g, "/:uuid") // Replace UUIDs
-    .replace(/\/[a-f0-9]{24}/g, "/:objectid"); // Replace MongoDB ObjectIds
+    .replace(/\/\d+/g, "/:id") // Replacable numbers with :id
+    .replace(/\/[a-f0-9-]{36}/g, "/:uuid") // Replacable UUIDs
+    .replace(/\/[a-f0-9]{24}/g, "/:objectid"); // Replacable MongoDB ObjectIds
 }
 
 // Routes
 app.get("/", (req, res) => {
+  logger.info("Got request on route /");
   res.json({
     message: "Welcome to the Express Server!",
     timestamp: new Date().toISOString(),
@@ -72,6 +88,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
+  logger.info("Got request on route /api/health");
   res.json({
     status: "OK",
     uptime: process.uptime(),
@@ -80,6 +97,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/users", (req, res) => {
+  logger.info("Got request on route GET: /api/users");
   const users = [
     { id: 1, name: "John Doe", email: "john@example.com" },
     { id: 2, name: "Jane Smith", email: "jane@example.com" },
@@ -88,6 +106,7 @@ app.get("/api/users", (req, res) => {
 });
 
 app.post("/api/users", (req, res) => {
+  logger.info("Got request on route POST: /api/users");
   const { name, email } = req.body;
 
   if (!name || !email) {
@@ -110,6 +129,7 @@ app.post("/api/users", (req, res) => {
 });
 
 app.get("/api/slowAPI", async (req, res) => {
+  logger.info("Got request on route GET: /api/slowAPI");
   try {
     const result = await slowFunction();
     return res.json({
@@ -117,6 +137,7 @@ app.get("/api/slowAPI", async (req, res) => {
       message: `Heavy task is completed in ${result}ms`,
     });
   } catch (err) {
+    logger.error(err.message);
     return res.status(500).json({ status: "Error", Error: err.message });
   }
 });
@@ -133,7 +154,7 @@ app.get("/metrics", async (req, res) => {
   }
 });
 
-// Keep the /api/metrics endpoint for backwards compatibility
+// Kept the /api/metrics endpoint for backwards compatibility
 app.get("/api/metrics", async (req, res) => {
   try {
     res.setHeader("Content-Type", promClient.register.contentType);
