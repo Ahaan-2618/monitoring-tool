@@ -50,8 +50,8 @@ bash
 Copy
 Edit
 # Clone the repo
-git clone https://github.com/Ahaan-2618/monitoring-tool.git
-cd monitoring-tool
+git clone https://github.com/Ahaan-2618/grafana-loki-prometheus-docker.git
+cd grafana-loki-prometheus-docker
 
 # Start everything
 docker-compose up --build
